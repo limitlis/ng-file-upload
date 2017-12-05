@@ -619,8 +619,8 @@ ngFileUpload.service('Upload', ['$parse', '$timeout', '$compile', '$q', 'UploadE
         if (validateAfterResize) {
           upload.validate(allNewFiles, keep ? prevValidFiles.length : 0, ngModel, attr, scope)
             .then(function (validationResult) {
-              valids = validationResult.validsFiles;
-              invalids = validationResult.invalidsFiles;
+              valids = validationResult.validFiles;
+              invalids = validationResult.invalidFiles;
               updateModel();
             });
         } else {
@@ -1674,14 +1674,15 @@ ngFileUpload.service('UploadValidate', ['UploadDataUrl', '$q', '$timeout', funct
 
         el.on('loadedmetadata', success);
         el.on('error', error);
+        
         var count = 0;
-
         function checkLoadError() {
+          count++;
           $timeout(function () {
             if (el[0].parentNode) {
               if (el[0].duration) {
                 success();
-              } else if (count > 10) {
+              } else if (count++ > 10) {
                 error();
               } else {
                 checkLoadError();
@@ -1908,7 +1909,14 @@ ngFileUpload.service('UploadResize', ['UploadValidate', '$q', function (UploadVa
     function isDisabled() {
       return elem.attr('disabled') || attrGetter('ngfDropDisabled', scope);
     }
-
+    function onPasteEvent(evt) {
+      if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1 &&
+        attrGetter('ngfEnableFirefoxPaste', scope)) {
+        evt.preventDefault();
+      }
+      if (isDisabled() || !upload.shouldUpdateOn('paste', attr, scope)) return;
+      extractFilesAndUpdateModel(evt.clipboardData || evt.originalEvent.clipboardData, evt, 'pasteUrl');
+    }
     if (attrGetter('ngfSelect') == null) {
       upload.registerModelChangeValidator(ngModel, attr, scope);
     }
@@ -1960,14 +1968,7 @@ ngFileUpload.service('UploadResize', ['UploadValidate', '$q', function (UploadVa
       actualDragOverClass = null;
       extractFilesAndUpdateModel(evt.dataTransfer, evt, 'dropUrl');
     }, false);
-    elem[0].addEventListener('paste', function (evt) {
-      if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1 &&
-        attrGetter('ngfEnableFirefoxPaste', scope)) {
-        evt.preventDefault();
-      }
-      if (isDisabled() || !upload.shouldUpdateOn('paste', attr, scope)) return;
-      extractFilesAndUpdateModel(evt.clipboardData || evt.originalEvent.clipboardData, evt, 'pasteUrl');
-    }, false);
+    document.addEventListener('paste', onPasteEvent, false);
 
     if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1 &&
       attrGetter('ngfEnableFirefoxPaste', scope)) {
@@ -2177,6 +2178,9 @@ ngFileUpload.service('UploadResize', ['UploadValidate', '$q', function (UploadVa
 
       return defer.promise;
     }
+    scope.$on('$destroy', function (){
+        document.removeEventListener('paste', onPasteEvent);
+    });
   }
 
   function dropAvailable() {

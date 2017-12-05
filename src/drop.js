@@ -56,7 +56,14 @@
     function isDisabled() {
       return elem.attr('disabled') || attrGetter('ngfDropDisabled', scope);
     }
-
+    function onPasteEvent(evt) {
+      if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1 &&
+        attrGetter('ngfEnableFirefoxPaste', scope)) {
+        evt.preventDefault();
+      }
+      if (isDisabled() || !upload.shouldUpdateOn('paste', attr, scope)) return;
+      extractFilesAndUpdateModel(evt.clipboardData || evt.originalEvent.clipboardData, evt, 'pasteUrl');
+    }
     if (attrGetter('ngfSelect') == null) {
       upload.registerModelChangeValidator(ngModel, attr, scope);
     }
@@ -108,14 +115,7 @@
       actualDragOverClass = null;
       extractFilesAndUpdateModel(evt.dataTransfer, evt, 'dropUrl');
     }, false);
-    elem[0].addEventListener('paste', function (evt) {
-      if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1 &&
-        attrGetter('ngfEnableFirefoxPaste', scope)) {
-        evt.preventDefault();
-      }
-      if (isDisabled() || !upload.shouldUpdateOn('paste', attr, scope)) return;
-      extractFilesAndUpdateModel(evt.clipboardData || evt.originalEvent.clipboardData, evt, 'pasteUrl');
-    }, false);
+    document.addEventListener('paste', onPasteEvent, false);
 
     if (navigator.userAgent.toLowerCase().indexOf('firefox') > -1 &&
       attrGetter('ngfEnableFirefoxPaste', scope)) {
@@ -325,6 +325,9 @@
 
       return defer.promise;
     }
+    scope.$on('$destroy', function (){
+        document.removeEventListener('paste', onPasteEvent);
+    });
   }
 
   function dropAvailable() {
